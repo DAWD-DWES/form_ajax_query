@@ -1,0 +1,5 @@
+/nbproject/private/
+composer.phar
+/vendor/
+/cache/*
+/.php-cs-fixer.cache
