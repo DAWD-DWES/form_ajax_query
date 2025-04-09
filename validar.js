@@ -1,58 +1,76 @@
 $(document).ready(function () {
-    $('#registro').submit(function (e) {
+    const form = $('#registro');
+
+    form.on('submit', function (e) {
         e.preventDefault();
 
-        var form = this;
-        var data = $(form).serialize();
+        const formElement = this;
+        const formData = form.serializeArray();
+        const data = {};
 
-        // Añadir botón submit pulsado
-        var submitBtn = $('input[name="enviar"]');
+        // Convertimos a objeto clave-valor
+        formData.forEach(field => {
+            data[field.name] = field.value;
+        });
+
+        // Añadir manualmente el botón submit si tiene name
+        const submitBtn = form.find('input[type="submit"][name]');
         if (submitBtn.length) {
-            data += '&' + encodeURIComponent(submitBtn.attr('name')) +
-                    '=' + encodeURIComponent(submitBtn.val());
+            data[submitBtn.attr('name')] = submitBtn.val();
         }
+
+        limpiarErrores(formElement);
 
         $.ajax({
             url: 'index.php',
             type: 'POST',
-            data: data,
+            data: $.param(data),
             dataType: 'json',
             success: function (response) {
-                $(form).removeClass('was-validated');
+                if (response?.errors) {
+                    mostrarErrores(formElement, response.errors);
+                }
 
-                // Limpiar feedback anterior
-                $.each(form.elements, function () {
-                    var input = this;
-                    var $input = $(input);
-                    var feedback = $input.closest('.input-group').find('.invalid-feedback');
-                    $input.removeClass('is-invalid is-valid');
-                    if (feedback.length) {
-                        feedback.text('').hide();
-                    }
-                });
-
-                // Mostrar errores si los hay
-                $.each(response.errors, function (fieldName, message) {
-                    var input = form.elements[fieldName];
-                    if (input) {
-                        var $input = $(input);
-                        var feedback = $input.closest('.input-group').find('.invalid-feedback');
-                        $input.addClass('is-invalid');
-                        if (feedback.length) {
-                            feedback.text(message).show();
-                        }
-                    }
-                });
-
-                if (response.success) {
-                    // Reenviar formulario o redirigir
-                    form.submit();
-                    // O bien: window.location.href = 'success.php';
+                if (response?.success) {
+                    console.log("Formulario válido. Enviando...");
+                    formElement.submit();
                 }
             },
             error: function (jqXHR, textStatus, errorThrown) {
-                console.error('Error de red o servidor:', textStatus, errorThrown);
+                console.error('Error en la solicitud AJAX:', textStatus, errorThrown);
             }
         });
     });
+
+    // Función para limpiar mensajes de error anteriores
+    function limpiarErrores(form) {
+        $(form).find('.is-valid, .is-invalid').removeClass('is-valid is-invalid');
+        $(form).find('.invalid-feedback').text('').hide();
+    }
+
+    // Función para aplicar errores recibidos del servidor
+    function mostrarErrores(form, errores) {
+        for (const fieldName in errores) {
+            const input = form.elements[fieldName];
+            if (!input)
+                continue;
+
+            const $input = $(input);
+            const $feedback = $input.closest('.input-group').find('.invalid-feedback');
+
+            $input.addClass('is-invalid');
+            if ($feedback.length) {
+                $feedback.text(errores[fieldName]).show();
+            }
+        }
+    }
+
+    $('#registro input').on('input', function () {
+        $(this).removeClass('is-invalid');
+        const $feedback = $(this).closest('.input-group').find('.invalid-feedback');
+        if ($feedback.length) {
+            $feedback.text('').hide();
+        }
+    });
+
 });

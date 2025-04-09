@@ -1,42 +1,48 @@
 <?php
-define("RETRO_NOMBRE_FORMATO", "El nombre de estar formado por al menos 3 caracteres de palabra");
-define("RETRO_EMAIL_FORMATO", "El correo debe tener un formato correcto");
-define("RETRO_PASS_NO_REPETIDO", "Los passwords introducidos deben de ser iguales");
-define("RETRO_PASS_FORMATO", "El password debe tener una minúscula, mayúscula, digito y caracter espercial");
+define("RETRO_NOMBRE_FORMATO", "El nombre debe estar formado por al menos 3 caracteres de palabra.");
+define("RETRO_EMAIL_FORMATO", "El correo debe tener un formato correcto.");
+define("RETRO_PASS_NO_REPETIDO", "Las contraseñas introducidas deben ser iguales.");
+define("RETRO_PASS_FORMATO", "El password debe tener una minúscula, mayúscula, dígito y carácter especial.");
 
-if (!empty($_POST)) {
-    if (filter_has_var(INPUT_POST, 'enviar')) {
-        $usuario = filter_input(INPUT_POST, 'usuario', FILTER_UNSAFE_RAW);
-        $errorUsuarioFormato = (filter_var($usuario, FILTER_VALIDATE_REGEXP, ["options" => [
-                        "regexp" => "/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ'´`\-]+(\s+[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ'´`\- ]+){0,5}$/"]]) === false);
-        $password1 = filter_input(INPUT_POST, 'password1', FILTER_UNSAFE_RAW);
-        $password2 = filter_input(INPUT_POST, 'password2', FILTER_UNSAFE_RAW);
-        $errorPasswordNoRepetido = ($password1 !== $password2);
-        $errorPasswordFormato = (filter_var($password1, FILTER_VALIDATE_REGEXP, ["options" => [
-                        "regexp" => "/(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[\W_]).{8,}/"]]) === false);
-        $email = filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL);
-        $errorEmailFormato = (filter_var($email, FILTER_VALIDATE_REGEXP, ["options" => [
-                        "regexp" => "/^[a-z0-9]+([_\\.-][a-z0-9]+)*@([a-z0-9]+([\.-][a-z0-9]+)*)+\\.[a-z]{2,}$/i"]]) === false);
-        $errors = [];
-        if ($errorUsuarioFormato) {
-            $errors['usuario'] = RETRO_NOMBRE_FORMATO;
-        }
-        if ($errorPasswordNoRepetido) {
-            $errors['password2'] = RETRO_PASS_NO_REPETIDO;
-        } else if ($errorPasswordFormato) {
-            $errors['password1'] = RETRO_PASS_FORMATO;
-        }
-        if ($errorEmailFormato) {
-            $errors['email'] = RETRO_EMAIL_FORMATO;
-        }
-        $response['success'] = empty($errors);
-        $response['errors'] = $errors;
-        header('Content-type: application/json');
-        echo json_encode($response);
-        die;
-    } else {
-        $procesa = true;
+$usuario = filter_input(INPUT_POST, 'usuario', FILTER_UNSAFE_RAW);
+$password1 = filter_input(INPUT_POST, 'password1', FILTER_UNSAFE_RAW);
+$password2 = filter_input(INPUT_POST, 'password2', FILTER_UNSAFE_RAW);
+$email = filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL);
+
+$errors = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Validación del lado del servidor
+    $errorUsuarioFormato = !preg_match("/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ'´`\-]+(\s+[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ'´`\- ]+){0,5}$/", $usuario ?? '') || mb_strlen(trim($usuario ?? '')) < 3;
+    $errorPasswordFormato = !preg_match("/(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[\W_]).{8,}/", $password1 ?? '');
+    $errorPasswordNoRepetido = $password1 !== $password2;
+    $errorEmailFormato = !preg_match("/^[a-z0-9]+([_\\.-][a-z0-9]+)*@([a-z0-9]+([\.-][a-z0-9]+)*)+\\.[a-z]{2,}$/i", $email ?? '');
+
+    if ($errorUsuarioFormato) {
+        $errors['usuario'] = RETRO_NOMBRE_FORMATO;
     }
+    if ($errorPasswordFormato) {
+        $errors['password1'] = RETRO_PASS_FORMATO;
+    }
+    if ($errorPasswordNoRepetido) {
+        $errors['password2'] = RETRO_PASS_NO_REPETIDO;
+    }
+    if ($errorEmailFormato) {
+        $errors['email'] = RETRO_EMAIL_FORMATO;
+    }
+
+    // Si la petición es AJAX, devolver JSON
+    if (isset($_SERVER['HTTP_ACCEPT']) && str_contains($_SERVER['HTTP_ACCEPT'], 'application/json')) {
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => empty($errors),
+            'errors' => $errors
+        ]);
+        exit;
+    }
+
+    // Si no es AJAX y no hay errores, marcar como procesado
+    $procesa = empty($errors);
 }
 ?>
 
@@ -44,12 +50,10 @@ if (!empty($_POST)) {
 <html lang="es">
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <!-- Bootstrap CDN -->
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-        <!-- Bootstrap Font Icon CSS -->
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
         <title>Registro</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
     </head>
     <body class="bg-info">
         <div class="container mt-5">
@@ -64,37 +68,42 @@ if (!empty($_POST)) {
                         <h3><i class="bi bi-gear p-2"></i>Registro</h3>
                     </div>
                     <div class="card-body">
-                        <form id="registro" name="registro" action="index.php" method="POST" novalidate>
+                        <form id="registro" method="POST" action="index.php" novalidate>
                             <div class="input-group my-2">
                                 <span class="input-group-text"><i class="bi bi-person"></i></span>
-                                <input type="text" class="form-control"  placeholder="usuario" 
-                                       id="usuario" name="usuario" value="<?= $usuario ?? '' ?>" autofocus>
-                                <div class="invalid-feedback">
-                                </div>
+                                <input type="text" class="form-control <?= isset($errors['usuario']) ? 'is-invalid' : '' ?>" 
+                                       id="usuario" name="usuario" placeholder="usuario" 
+                                       value="<?= htmlspecialchars($usuario ?? '') ?>">
+                                <div class="invalid-feedback"><?= $errors['usuario'] ?? '' ?></div>
                             </div>
+
                             <div class="input-group my-2">
                                 <span class="input-group-text"><i class="bi bi-key"></i></span>
-                                <input type="password" class="form-control" placeholder="contraseña" id="password1" name="password1" 
-                                       value="<?= $password1 ?? '' ?>">
-                                <div class="invalid-feedback">
-                                </div>
-                                <div class="input-group my-2">
-                                    <span class="input-group-text"><i class="bi bi-key"></i></span>
-                                    <input type="password" class="form-control"  
-                                           placeholder="Repita la contraseña" id="password2" name="password2" value="<?= $password2 ?? '' ?>">
-                                    <div class="invalid-feedback">
-                                    </div>
-                                </div>
-                                <div class="input-group my-2">
-                                    <span class="input-group-text"><i class="bi bi-envelope"></i></span>
-                                    <input type="email" class="form-control"
-                                           placeholder="e-Mail" name="email" id="email" value="<?= $email ?? '' ?>">
-                                    <div class="invalid-feedback">
-                                    </div>
-                                </div>
-                                <div class="text-end">
-                                    <input type="submit" value="Registrar" class="btn btn-info" name="enviar">
-                                </div>
+                                <input type="password" class="form-control <?= isset($errors['password1']) ? 'is-invalid' : '' ?>" 
+                                       id="password1" name="password1" placeholder="contraseña" 
+                                       value="<?= htmlspecialchars($password1 ?? '') ?>">
+                                <div class="invalid-feedback"><?= $errors['password1'] ?? '' ?></div>
+                            </div>
+
+                            <div class="input-group my-2">
+                                <span class="input-group-text"><i class="bi bi-key"></i></span>
+                                <input type="password" class="form-control <?= isset($errors['password2']) ? 'is-invalid' : '' ?>" 
+                                       id="password2" name="password2" placeholder="Repite la contraseña" 
+                                       value="<?= htmlspecialchars($password2 ?? '') ?>">
+                                <div class="invalid-feedback"><?= $errors['password2'] ?? '' ?></div>
+                            </div>
+
+                            <div class="input-group my-2">
+                                <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                                <input type="email" class="form-control <?= isset($errors['email']) ? 'is-invalid' : '' ?>" 
+                                       id="email" name="email" placeholder="e-Mail" 
+                                       value="<?= htmlspecialchars($email ?? '') ?>">
+                                <div class="invalid-feedback"><?= $errors['email'] ?? '' ?></div>
+                            </div>
+
+                            <div class="text-end">
+                                <input type="submit" value="Registrar" class="btn btn-info" name="enviar">
+                            </div>
                         </form>
                     </div>
                 </div>
